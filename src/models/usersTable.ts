@@ -1,6 +1,6 @@
 import pool from "../config/db";
 
-const createTables = async () => {
+const createUsersTable = async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
@@ -9,6 +9,12 @@ const createTables = async () => {
         phone VARCHAR(15) UNIQUE NOT NULL,
         password TEXT NOT NULL,
         role VARCHAR(50) CHECK (role IN ('admin', 'omborchi', 'sotuvchi', 'ishchi')) DEFAULT 'ishchi',
+        salary_type VARCHAR(20) CHECK (salary_type IN ('oylik', 'soatlik', 'ish_bay')) DEFAULT 'oylik',
+        salary_amount NUMERIC(12,2) DEFAULT 0,
+        total_hours NUMERIC(10,2) DEFAULT 0,
+        final_salary NUMERIC(12,2) DEFAULT 0,
+        total_received NUMERIC(12,2) DEFAULT 0,
+        total_output_products NUMERIC(12,2) DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
@@ -19,4 +25,4 @@ const createTables = async () => {
   }
 };
 
-export default createTables;
+export default createUsersTable;

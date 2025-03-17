@@ -7,11 +7,11 @@ import { validationResult } from "express-validator";
 // JWT yaratish funksiyasi
 const generateToken = (id: number, role: string) => {
   return jwt.sign({ id, role }, process.env.JWT_SECRET as string, {
-    expiresIn: "1h",
+    expiresIn: "24h",
   });
 };
 
-// 📌 Ro‘yxatdan o‘tish
+/// 📌 Ro‘yxatdan o‘tish (faqat admin foydalanuvchi qo‘shishi mumkin)
 export const register = async (req: Request, res: Response): Promise<void> => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -19,9 +19,37 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
-  const { fullname, phone, password, role } = req.body;
+  // 📌 Tokenni olish
+  const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
+
+  if (!token) {
+    res.status(401).json({ message: "Token mavjud emas" });
+    return;
+  }
 
   try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as {
+      id: number;
+      role: string;
+    };
+
+    // 📌 Faqat admin foydalanuvchi yaratishi mumkin
+    if (decoded.role !== "admin") {
+      res
+        .status(403)
+        .json({ message: "Sizda foydalanuvchi yaratish huquqi yo‘q" });
+      return;
+    }
+
+    const {
+      fullname,
+      phone,
+      password,
+      role,
+      salary_type = "oylik",
+      salary_amount = 0.0,
+    } = req.body;
+
     const userCheck = await pool.query("SELECT * FROM users WHERE phone = $1", [
       phone,
     ]);
@@ -36,27 +64,29 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     const hashedPassword = await bcrypt.hash(password, salt);
 
     const newUser = await pool.query(
-      "INSERT INTO users (fullname, phone, password, role) VALUES ($1, $2, $3, $4) RETURNING *",
-      [fullname, phone, hashedPassword, role || "ishchi"]
+      `INSERT INTO users 
+      (fullname, phone, password, role, salary_type, salary_amount, total_hours, final_salary, total_received, total_output_products) 
+      VALUES ($1, $2, $3, $4, $5, $6, 0.00, 0.00, 0.00, 0.00) 
+      RETURNING *`,
+      [
+        fullname,
+        phone,
+        hashedPassword,
+        role || "ishchi",
+        salary_type,
+        salary_amount,
+      ]
     );
 
-    const token = generateToken(newUser.rows[0].id, newUser.rows[0].role);
-
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 3600000,
+    res.status(201).json({
+      message: "Foydalanuvchi muvaffaqiyatli ro‘yxatdan o‘tdi",
     });
-
-    res
-      .status(201)
-      .json({ message: "Foydalanuvchi muvaffaqiyatli ro‘yxatdan o‘tdi" });
   } catch (error) {
     res.status(500).json({ message: "Server xatosi", error });
   }
 };
 
-// 📌 Kirish (Login)
+/// 📌 Kirish (Login)
 export const login = async (req: Request, res: Response): Promise<void> => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -91,7 +121,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       maxAge: 3600000,
     });
 
-    res.json({ message: "Tizimga muvaffaqiyatli kirdingiz" });
+    res.json({ message: "Tizimga muvaffaqiyatli kirdingiz", token });
   } catch (error) {
     res.status(500).json({ message: "Server xatosi", error });
   }

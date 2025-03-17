@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { register, login, logout } from "../controllers/authController";
-import { body } from "express-validator";
+import { body, check } from "express-validator";
+import { checkPermission } from "../middleware/permissionMiddleware";
+import { authMiddleware } from "../middleware/authMiddleware";
 
 const router = Router();
 
@@ -19,6 +21,8 @@ router.post(
       .isIn(["admin", "omborchi", "sotuvchi", "ishchi"])
       .withMessage("Noto‘g‘ri rol tanlandi"),
   ],
+  authMiddleware,
+  checkPermission("can_create"),
   register
 );
 
